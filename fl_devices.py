@@ -2,26 +2,11 @@ import random
 import torch
 from torch.utils.data import DataLoader
 import numpy as np
-from sklearn.cluster import AgglomerativeClustering
+from sklearn.cluster import AgglomerativeClustering, DBSCAN
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-def train_op(model, loader, optimizer, epochs=1):
-    model.train()  
-    for ep in range(epochs):
-        running_loss, samples = 0.0, 0
-        for x, y in loader: 
-            x, y = x.to(device), y.to(device)
-            optimizer.zero_grad()
 
-            loss = torch.nn.CrossEntropyLoss()(model(x), y)
-            running_loss += loss.item()*y.shape[0]
-            samples += y.shape[0]
-
-            loss.backward()
-            optimizer.step()  
-
-    return running_loss / samples
       
 def eval_op(model, loader):
     model.train()
@@ -83,9 +68,16 @@ class FederatedTrainingDevice(object):
   
   
 class Client(FederatedTrainingDevice):
-    def __init__(self, model_fn, optimizer_fn, data, idnum, batch_size=128, train_frac=0.8):
+    def __init__(self, model_fn, optimizer_fn, data, idnum, batch_size=128, train_frac=0.8, mode=None):
         super().__init__(model_fn, data)  
         self.optimizer = optimizer_fn(self.model.parameters())
+
+        # mode - client behavior
+        # None: normal client
+        # 'random': adversary - generate random gradients
+        # 'opposite': adversary - mutiply each gradient by -1
+        # 'swap': adversary - swap labels of corresponding features
+        self.mode = mode
             
         self.data = data
         n_train = int(len(data)*train_frac)
@@ -106,19 +98,59 @@ class Client(FederatedTrainingDevice):
     def compute_weight_update(self, epochs=1, loader=None):
         copy(target=self.W_old, source=self.W)
         self.optimizer.param_groups[0]["lr"]*=0.99
-        train_stats = train_op(self.model, self.train_loader if not loader else loader, self.optimizer, epochs)
+        train_stats = self.train_op(self.model, self.train_loader if not loader else loader, self.optimizer, epochs)
         subtract_(target=self.dW, minuend=self.W, subtrahend=self.W_old)
         return train_stats  
 
     def reset(self): 
         copy(target=self.W, source=self.W_old)
+
+    def train_op(self, model, loader, optimizer, epochs=1):
+	    model.train()  
+	    for ep in range(epochs):
+	        running_loss, samples = 0.0, 0
+	        for x, y in loader: 
+	        	# adversary: handle labels
+	        	if self.mode == 'swap':
+	        		x, y = self.handle_labels()
+
+	            x, y = x.to(device), y.to(device)
+	            optimizer.zero_grad()
+
+	            loss = torch.nn.CrossEntropyLoss()(model(x), y)
+	            running_loss += loss.item()*y.shape[0]
+	            samples += y.shape[0]
+
+	            loss.backward()
+
+	            # adversary: handle gradients
+	            if self.mode == 'random' or self.mode == 'opposite':
+	            	self.handle_gradients()
+
+	            optimizer.step()  
+
+	    return running_loss / samples
+
+
+
     
+    def handle_labels(self):
+    	pass
+
+    def handle_gradients(self):
+    	pass
+
+
+
+
     
 class Server(FederatedTrainingDevice):
-    def __init__(self, model_fn, data):
+    def __init__(self, model_fn, data, detect_mode='DBSCAN'):
         super().__init__(model_fn, data)
         self.loader = DataLoader(self.data, batch_size=128, shuffle=False)
         self.model_cache = []
+
+        self.detect_mode = detect_mode
     
     def select_clients(self, clients, frac=1.0):
         return random.sample(clients, int(len(clients)*frac)) 
@@ -135,7 +167,20 @@ class Server(FederatedTrainingDevice):
         c1 = np.argwhere(clustering.labels_ == 0).flatten() 
         c2 = np.argwhere(clustering.labels_ == 1).flatten() 
         return c1, c2
+
+
+
+    def detect_adversary(self, clients):
+    	if self.detect_mode == 'DBSCAN':
+
+    		# Noisy samples are given the label -1
+    		clustering = DBSCAN(distance_matrix)
+
+    	pass
     
+
+
+
     def aggregate_clusterwise(self, client_clusters):
         for cluster in client_clusters:
             reduce_add_average(targets=[client.W for client in cluster], 
