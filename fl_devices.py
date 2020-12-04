@@ -68,12 +68,12 @@ class FederatedTrainingDevice(object):
   
   
 class Client(FederatedTrainingDevice):
-    def __init__(self, model_fn, optimizer_fn, data, idnum, batch_size=128, train_frac=0.8, mode=None):
+    def __init__(self, model_fn, optimizer_fn, data, idnum, batch_size=128, train_frac=0.8, mode='normal'):
         super().__init__(model_fn, data)  
         self.optimizer = optimizer_fn(self.model.parameters())
 
         # mode - client behavior
-        # None: normal client
+        # 'normal': normal client
         # 'random': adversary - generate random gradients
         # 'opposite': adversary - mutiply each gradient by -1
         # 'swap': adversary - swap labels of corresponding features
@@ -112,7 +112,7 @@ class Client(FederatedTrainingDevice):
 	        for x, y in loader: 
 	        	# adversary: handle labels
 	        	if self.mode == 'swap':
-	        		x, y = self.handle_labels()
+	        		y = self.handle_labels(y, 2, 7)
 
 	            x, y = x.to(device), y.to(device)
 	            optimizer.zero_grad()
@@ -134,11 +134,35 @@ class Client(FederatedTrainingDevice):
 
 
     
-    def handle_labels(self):
-    	pass
+    def handle_labels(self, labels, label_1, label_2):
+    	labels[labels == label_1] = -1
+    	labels[labels == label_2] = label_1
+    	labels[labels == -1] = label_2
+
+    	return features, labels
 
     def handle_gradients(self):
-    	pass
+    	if self.mode == 'random':
+    		max_grad = torch.max(next(self.model.parameters()).grad)
+    		min_grad = torch.min(next(self.model.parameters()).grad)
+
+    		for param in self.model.parameters():
+    			curr_max_grad = torch.max(param.grad)
+    			curr_min_grad = torch.min(param.grad)
+
+    			if curr_max_grad > max_grad:
+    				max_grad = curr_max_grad
+    			if curr_min_grad < min_grad:
+    				min_grad = curr_min_grad
+
+    		diff_grad = max_grad - min_grad
+
+    		for param in self.model.parameters():
+    			param.grad = torch.rand(param.grad.shape, dtype=param.grad.dtype, device=param.grad.device) * diff_grad + min_grad
+
+    	elif self.mode == 'opposite':
+    		for param in self.model.parameters():
+    			param.grad *= -1
 
 
 
