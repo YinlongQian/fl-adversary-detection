@@ -169,12 +169,13 @@ class Client(FederatedTrainingDevice):
 
     
 class Server(FederatedTrainingDevice):
-    def __init__(self, model_fn, data, detect_mode='DBSCAN'):
+    def __init__(self, model_fn, data, detect_mode='DBSCAN', distance_metric='euclidean'):
         super().__init__(model_fn, data)
         self.loader = DataLoader(self.data, batch_size=128, shuffle=False)
         self.model_cache = []
 
         self.detect_mode = detect_mode
+        self.distance_metric = distance_metric
     
     def select_clients(self, clients, frac=1.0):
         return random.sample(clients, int(len(clients)*frac)) 
@@ -194,13 +195,13 @@ class Server(FederatedTrainingDevice):
 
 
 
-    def detect_adversary(self, clients):
+    def detect_adversary(self, feature_matrix):
     	if self.detect_mode == 'DBSCAN':
 
     		# Noisy samples are given the label -1
-    		clustering = DBSCAN(distance_matrix)
-
-    	pass
+    		clustering = DBSCAN(esp=0.5, min_samples=2, metric=self.metric).fit(feature_matrix)
+    		adversary_idx = np.argwhere(clustering.labels_ == -1).flatten
+    		return adversary_idx
     
 
 
