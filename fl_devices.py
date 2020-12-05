@@ -33,12 +33,7 @@ def copy(target, source):
 def subtract_(target, minuend, subtrahend):
     for name in target:
         target[name].data = minuend[name].data.clone()-subtrahend[name].data.clone()
-    
-def reduce_add_average(targets, sources):
-    for target in targets:
-        for name in target:
-            tmp = torch.mean(torch.stack([source[name].data for source in sources]), dim=0).clone()
-            target[name].data += tmp
+
         
 def flatten(source):
     return torch.cat([value.flatten() for value in source.values()])
@@ -178,10 +173,10 @@ class Server(FederatedTrainingDevice):
     
     def select_clients(self, clients, frac=1.0):
         return random.sample(clients, int(len(clients)*frac)) 
-    
+    """
     def aggregate_weight_updates(self, clients):
         reduce_add_average(target=self.W, sources=[client.dW for client in clients])
-        
+    """
     def compute_pairwise_similarities(self, clients):
         return pairwise_angles([client.dW for client in clients])
   
@@ -194,6 +189,8 @@ class Server(FederatedTrainingDevice):
 
 
 
+
+
     def detect_adversary(self, feature_matrix, esp, min_samples, metric):
     	if self.detect_mode == 'DBSCAN':
 
@@ -202,6 +199,17 @@ class Server(FederatedTrainingDevice):
     		adversary_idx = np.argwhere(clustering.labels_ == -1).flatten
     		return adversary_idx
     
+    def aggregate_weight_updates(self, clients):
+        reduce_add_average(target=self.W, sources=[client.dW for client in clients])
+
+    def reduce_add_average(self, target, sources):
+        for param_name in target:
+            step = torch.mean(torch.stack([source[param_name].data for source in sources]), dim=0).clone()
+            target[param_name].data += step
+
+    def copy_weights(self, clients):
+        for client in clients:
+            client.W = self.W.clone()
 
 
 
