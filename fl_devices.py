@@ -68,7 +68,7 @@ class FederatedTrainingDevice(object):
   
   
 class Client(FederatedTrainingDevice):
-    def __init__(self, model_fn, optimizer_fn, data, idnum, batch_size=128, train_frac=0.8, mode='normal'):
+    def __init__(self, model_fn, optimizer_fn, data, idnum, batch_size=128, train_frac=0.8, client_mode='normal'):
         super().__init__(model_fn, data)  
         self.optimizer = optimizer_fn(self.model.parameters())
 
@@ -77,7 +77,7 @@ class Client(FederatedTrainingDevice):
         # 'random': adversary - generate random gradients
         # 'opposite': adversary - mutiply each gradient by -1
         # 'swap': adversary - swap labels of corresponding features
-        self.mode = mode
+        self.client_mode = client_mode
             
         self.data = data
         n_train = int(len(data)*train_frac)
@@ -106,63 +106,63 @@ class Client(FederatedTrainingDevice):
         copy(target=self.W, source=self.W_old)
 
     def train_op(self, model, loader, optimizer, epochs=1):
-	    model.train()  
-	    for ep in range(epochs):
-	        running_loss, samples = 0.0, 0
-	        for x, y in loader: 
-	        	# adversary: handle labels
-	        	if self.mode == 'swap':
-	        		y = self.handle_labels(y, 2, 7)
+        model.train()  
+        for ep in range(epochs):
+            running_loss, samples = 0.0, 0
+            for x, y in loader: 
+                # adversary: handle labels
+                if self.client_mode == 'swap':
+                    y = self.handle_labels(y, 2, 7)
 
-	            x, y = x.to(device), y.to(device)
-	            optimizer.zero_grad()
+                x, y = x.to(device), y.to(device)
+                optimizer.zero_grad()
 
-	            loss = torch.nn.CrossEntropyLoss()(model(x), y)
-	            running_loss += loss.item()*y.shape[0]
-	            samples += y.shape[0]
+                loss = torch.nn.CrossEntropyLoss()(model(x), y)
+                running_loss += loss.item()*y.shape[0]
+                samples += y.shape[0]
 
-	            loss.backward()
+                loss.backward()
 
-	            # adversary: handle gradients
-	            if self.mode == 'random' or self.mode == 'opposite':
-	            	self.handle_gradients()
+                # adversary: handle gradients
+                if self.client_mode == 'random' or self.client_mode == 'opposite':
+                    self.handle_gradients()
 
-	            optimizer.step()  
+                optimizer.step()  
 
-	    return running_loss / samples
+        return running_loss / samples
 
 
 
     
     def handle_labels(self, labels, label_1, label_2):
-    	labels[labels == label_1] = -1
-    	labels[labels == label_2] = label_1
-    	labels[labels == -1] = label_2
+        labels[labels == label_1] = -1
+        labels[labels == label_2] = label_1
+        labels[labels == -1] = label_2
 
-    	return features, labels
+        return features, labels
 
     def handle_gradients(self):
-    	if self.mode == 'random':
-    		max_grad = torch.max(next(self.model.parameters()).grad)
-    		min_grad = torch.min(next(self.model.parameters()).grad)
+        if self.client_mode == 'random':
+            max_grad = torch.max(next(self.model.parameters()).grad)
+            min_grad = torch.min(next(self.model.parameters()).grad)
 
-    		for param in self.model.parameters():
-    			curr_max_grad = torch.max(param.grad)
-    			curr_min_grad = torch.min(param.grad)
+            for param in self.model.parameters():
+                curr_max_grad = torch.max(param.grad)
+                curr_min_grad = torch.min(param.grad)
 
-    			if curr_max_grad > max_grad:
-    				max_grad = curr_max_grad
-    			if curr_min_grad < min_grad:
-    				min_grad = curr_min_grad
+                if curr_max_grad > max_grad:
+                    max_grad = curr_max_grad
+                if curr_min_grad < min_grad:
+                    min_grad = curr_min_grad
 
-    		diff_grad = max_grad - min_grad
+            diff_grad = max_grad - min_grad
 
-    		for param in self.model.parameters():
-    			param.grad = torch.rand(param.grad.shape, dtype=param.grad.dtype, device=param.grad.device) * diff_grad + min_grad
+            for param in self.model.parameters():
+                param.grad = torch.rand(param.grad.shape, dtype=param.grad.dtype, device=param.grad.device) * diff_grad + min_grad
 
-    	elif self.mode == 'opposite':
-    		for param in self.model.parameters():
-    			param.grad *= -1
+        elif self.client_mode == 'opposite':
+            for param in self.model.parameters():
+                param.grad *= -1
 
 
 
@@ -175,7 +175,6 @@ class Server(FederatedTrainingDevice):
         self.model_cache = []
 
         self.detect_mode = detect_mode
-        self.distance_metric = distance_metric
     
     def select_clients(self, clients, frac=1.0):
         return random.sample(clients, int(len(clients)*frac)) 
@@ -195,11 +194,11 @@ class Server(FederatedTrainingDevice):
 
 
 
-    def detect_adversary(self, feature_matrix):
+    def detect_adversary(self, feature_matrix, esp, min_samples, metric):
     	if self.detect_mode == 'DBSCAN':
 
     		# Noisy samples are given the label -1
-    		clustering = DBSCAN(esp=0.5, min_samples=2, metric=self.metric).fit(feature_matrix)
+    		clustering = DBSCAN(esp=esp, min_samples=min_samples, metric=metric).fit(feature_matrix)
     		adversary_idx = np.argwhere(clustering.labels_ == -1).flatten
     		return adversary_idx
     
