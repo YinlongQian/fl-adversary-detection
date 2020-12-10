@@ -214,7 +214,7 @@ class Server(FederatedTrainingDevice):
 
     def copy_weights(self, clients):
         for client in clients:
-            client.W = copy(self.W)
+            copy(client.W, self.W)
 
 
 
