@@ -33,15 +33,15 @@ def copy(target, source):
 def subtract_(target, minuend, subtrahend, mode='normal'):
     for name in target:
         if mode == 'normal':
-          target[name].data = minuend[name].data.clone()-subtrahend[name].data.clone()
+            target[name].data = minuend[name].data.clone()-subtrahend[name].data.clone()
         elif mode == 'random':
-          diff = minuend[name].data.clone()-subtrahend[name].data.clone()
-          diff_max = torch.max(diff)
-          diff_min = torch.min(diff)
-          diff_inter = diff_max - diff_min 
-          target[name].data = diff_inter * torch.clamp(torch.randn_like(diff),min=0,max=1) + diff_min 
+            diff = minuend[name].data.clone()-subtrahend[name].data.clone()
+            diff_max = torch.max(diff)
+            diff_min = torch.min(diff)
+            diff_inter = diff_max - diff_min 
+            target[name].data = diff_inter * torch.clamp(torch.randn_like(diff),min=0,max=1) + diff_min 
         elif mode == 'opposite': 
-          target[name].data = -1 * (minuend[name].data.clone()-subtrahend[name].data.clone())
+            target[name].data = -1 * (minuend[name].data.clone()-subtrahend[name].data.clone())
 
         
 def flatten(source):
@@ -197,12 +197,12 @@ class Server(FederatedTrainingDevice):
         return c1, c2
 
     def detect_adversary(self, feature_matrix, esp, min_samples, metric):
-    	if self.detect_mode == 'DBSCAN':
+        if self.detect_mode == 'DBSCAN':
 
-    		# Noisy samples are given the label -1
-    		clustering = DBSCAN(eps=esp, min_samples=min_samples, metric=metric).fit(feature_matrix)
-    		adversary_idx = np.argwhere(clustering.labels_ == -1).flatten()
-    		return adversary_idx
+            # Noisy samples are given the label -1
+            clustering = DBSCAN(eps=esp, min_samples=min_samples, metric=metric).fit(feature_matrix)
+            adversary_idx = np.argwhere(clustering.labels_ == -1).flatten()
+            return adversary_idx
     
     def aggregate_weight_updates(self, clients):
         self.reduce_add_average(target=self.W, sources=[client.dW for client in clients])
@@ -214,7 +214,7 @@ class Server(FederatedTrainingDevice):
 
     def copy_weights(self, clients):
         for client in clients:
-            client.W = deepcopy(self.W)
+            client.W = copy(self.W)
 
 
 
