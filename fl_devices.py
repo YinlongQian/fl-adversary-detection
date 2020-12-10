@@ -3,7 +3,7 @@ import torch
 from torch.utils.data import DataLoader
 import numpy as np
 from sklearn.cluster import AgglomerativeClustering, DBSCAN
-
+from copy import deepcopy
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
@@ -187,20 +187,16 @@ class Server(FederatedTrainingDevice):
         c2 = np.argwhere(clustering.labels_ == 1).flatten() 
         return c1, c2
 
-
-
-
-
     def detect_adversary(self, feature_matrix, esp, min_samples, metric):
     	if self.detect_mode == 'DBSCAN':
 
     		# Noisy samples are given the label -1
-    		clustering = DBSCAN(esp=esp, min_samples=min_samples, metric=metric).fit(feature_matrix)
+    		clustering = DBSCAN(eps=esp, min_samples=min_samples, metric=metric).fit(feature_matrix)
     		adversary_idx = np.argwhere(clustering.labels_ == -1).flatten
     		return adversary_idx
     
     def aggregate_weight_updates(self, clients):
-        reduce_add_average(target=self.W, sources=[client.dW for client in clients])
+        self.reduce_add_average(target=self.W, sources=[client.dW for client in clients])
 
     def reduce_add_average(self, target, sources):
         for param_name in target:
@@ -209,7 +205,7 @@ class Server(FederatedTrainingDevice):
 
     def copy_weights(self, clients):
         for client in clients:
-            client.W = self.W.clone()
+            client.W = deepcopy(self.W)
 
 
 
