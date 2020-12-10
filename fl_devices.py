@@ -30,9 +30,18 @@ def copy(target, source):
     for name in target:
         target[name].data = source[name].data.clone()
     
-def subtract_(target, minuend, subtrahend):
+def subtract_(target, minuend, subtrahend, mode='normal'):
     for name in target:
-        target[name].data = minuend[name].data.clone()-subtrahend[name].data.clone()
+        if mode == 'normal':
+          target[name].data = minuend[name].data.clone()-subtrahend[name].data.clone()
+        elif mode == 'random':
+          diff = minuend[name].data.clone()-subtrahend[name].data.clone()
+          diff_max = torch.max(diff)
+          diff_min = torch.min(diff)
+          diff_inter = diff_max - diff_min 
+          target[name].data = diff_inter * torch.clamp(torch.randn_like(diff),min=0,max=1) + diff_min 
+        elif mode == 'opposite': 
+          target[name].data = -1 * (minuend[name].data.clone()-subtrahend[name].data.clone())
 
         
 def flatten(source):
@@ -94,7 +103,7 @@ class Client(FederatedTrainingDevice):
         copy(target=self.W_old, source=self.W)
         self.optimizer.param_groups[0]["lr"]*=0.99
         train_stats = self.train_op(self.model, self.train_loader if not loader else loader, self.optimizer, epochs)
-        subtract_(target=self.dW, minuend=self.W, subtrahend=self.W_old)
+        subtract_(target=self.dW, minuend=self.W, subtrahend=self.W_old, mode=self.client_mode)
         return train_stats  
 
     def reset(self): 
@@ -119,8 +128,8 @@ class Client(FederatedTrainingDevice):
                 loss.backward()
 
                 # adversary: handle gradients
-                if self.client_mode == 'random' or self.client_mode == 'opposite':
-                    self.handle_gradients()
+                # if self.client_mode == 'random' or self.client_mode == 'opposite':
+                #     self.handle_gradients()
 
                 optimizer.step()  
 
@@ -134,7 +143,7 @@ class Client(FederatedTrainingDevice):
         labels[labels == label_2] = label_1
         labels[labels == -1] = label_2
 
-        return features, labels
+        return labels
 
     def handle_gradients(self):
         if self.client_mode == 'random':
@@ -192,7 +201,7 @@ class Server(FederatedTrainingDevice):
 
     		# Noisy samples are given the label -1
     		clustering = DBSCAN(eps=esp, min_samples=min_samples, metric=metric).fit(feature_matrix)
-    		adversary_idx = np.argwhere(clustering.labels_ == -1).flatten
+    		adversary_idx = np.argwhere(clustering.labels_ == -1).flatten()
     		return adversary_idx
     
     def aggregate_weight_updates(self, clients):
