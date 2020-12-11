@@ -201,8 +201,10 @@ class Server(FederatedTrainingDevice):
 
             # Noisy samples are given the label -1
             clustering = DBSCAN(eps=esp, min_samples=min_samples, metric=metric).fit(feature_matrix)
-            adversary_idx = np.argwhere(clustering.labels_ == -1).flatten()
-            return adversary_idx
+            return clustering.labels_
+
+            #adversary_idx = np.argwhere(clustering.labels_ == -1).flatten()
+            #return adversary_idx
     
     def aggregate_weight_updates(self, clients):
         self.reduce_add_average(target=self.W, sources=[client.dW for client in clients])
