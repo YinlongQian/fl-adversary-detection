@@ -42,6 +42,9 @@ def subtract_(target, minuend, subtrahend, mode='normal'):
             target[name].data = diff_inter * torch.clamp(torch.randn_like(diff),min=0,max=1) + diff_min 
         elif mode == 'opposite': 
             target[name].data = -1 * (minuend[name].data.clone()-subtrahend[name].data.clone())
+        elif mode == 'mode_3':
+            #TODO
+            pass
 
         
 def flatten(source):
