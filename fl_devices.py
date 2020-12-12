@@ -42,6 +42,9 @@ def subtract_(target, minuend, subtrahend, mode='normal'):
             target[name].data = diff_inter * torch.clamp(torch.randn_like(diff),min=0,max=1) + diff_min 
         elif mode == 'opposite': 
             target[name].data = -1 * (minuend[name].data.clone()-subtrahend[name].data.clone())
+        elif mode == 'mode_3':
+            #TODO
+            pass
 
         
 def flatten(source):
@@ -115,8 +118,8 @@ class Client(FederatedTrainingDevice):
             running_loss, samples = 0.0, 0
             for x, y in loader: 
                 # adversary: handle labels
-                if self.client_mode == 'swap':
-                    y = self.handle_labels(y, 2, 7)
+                #if self.client_mode == 'swap':
+                #    y = self.handle_labels(y, 2, 7)
 
                 x, y = x.to(device), y.to(device)
                 optimizer.zero_grad()
