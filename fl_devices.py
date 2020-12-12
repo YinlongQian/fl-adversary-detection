@@ -116,7 +116,8 @@ class Client(FederatedTrainingDevice):
             for x, y in loader: 
                 # adversary: handle labels
                 if self.client_mode == 'swap':
-                    y = self.handle_labels(y, 2, 7)
+                    # y = self.handle_labels(y, 2, 7)
+                    y = self.zero_labels(y)
 
                 x, y = x.to(device), y.to(device)
                 optimizer.zero_grad()
@@ -135,14 +136,16 @@ class Client(FederatedTrainingDevice):
 
         return running_loss / samples
 
-
-
     
-    def handle_labels(self, labels, label_1, label_2):
+    def handle_labels(self, labels, label_1, lab):
         labels[labels == label_1] = -1
         labels[labels == label_2] = label_1
         labels[labels == -1] = label_2
 
+        return labels
+
+    def zero_labels(self, labels):
+        labels = 0
         return labels
 
     def handle_gradients(self):
