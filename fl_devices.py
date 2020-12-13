@@ -139,6 +139,32 @@ class Client(FederatedTrainingDevice):
 
         return running_loss / samples
 
+
+
+    def handle_labels_3(self, labels):
+        label_set = set()
+        for label in labels:
+            label_set.add(label.item())
+
+        label_set = list(label_set)
+        np.random.shuffle(label_set)
+
+        labels[labels == label_set[0]] = -1
+        labels[labels == label_set[1]] = label_set[0]
+        labels[labels == -1] = label_set[1]
+      
+        return labels
+
+    def handle_labels_2(self, labels):
+        label_set = set()
+        for label in labels:
+            label_set.add(label.item())
+
+        label_set = list(label_set)
+        target_label = label_set[np.random.randint(0, len(label_set))]
+
+        target_labels = torch.ones_like(labels) * target_label
+        return target_labels
     
     def handle_labels(self, labels, label_1, lab):
         labels[labels == label_1] = -1
