@@ -241,6 +241,14 @@ class Server(FederatedTrainingDevice):
     def aggregate_weight_updates(self, clients):
         self.reduce_add_average(target=self.W, sources=[client.dW for client in clients])
 
+    def aggregate_wieght_updates_weight(self, clients, weights):
+        self.reduce_add_average_weight(target=self.W, sources=[client.dW for client in clients], weights=weights)
+
+    def reduce_add_average_weight(self, target, sources, weights):
+        for param_name in target:
+            step = torch.sum(torch.stack([source[param_name].data * weights[i] for i, source in enumerate(sources)]), dim=0).clone()
+            target[param_name].data += step / np.sum(weights)
+    
     def reduce_add_average(self, target, sources):
         for param_name in target:
             step = torch.mean(torch.stack([source[param_name].data for source in sources]), dim=0).clone()
