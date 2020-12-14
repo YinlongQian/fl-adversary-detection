@@ -119,8 +119,8 @@ class Client(FederatedTrainingDevice):
             for x, y in loader: 
                 # adversary: handle labels
                 if self.client_mode == 'swap':
-                    # y = self.handle_labels(y, 2, 7)
-                    y = self.zero_labels(y)
+                    y = self.handle_labels_3(y)
+                    #y = self.zero_labels(y)
 
                 x, y = x.to(device), y.to(device)
                 optimizer.zero_grad()
